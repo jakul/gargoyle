@@ -5,7 +5,7 @@ gargoyle.tests.tests
 :copyright: (c) 2010 DISQUS.
 :license: Apache License 2.0, see LICENSE for more details.
 """
-
+from __future__ import absolute_import
 from django.contrib.auth.models import User, AnonymousUser
 from django.core.cache import cache
 from django.http import HttpRequest, Http404, HttpResponse
@@ -16,10 +16,13 @@ from gargoyle.builtins import IPAddressConditionSet, UserConditionSet
 from gargoyle.decorators import switch_is_active
 from gargoyle.helpers import MockRequest
 from gargoyle.models import Switch, SwitchManager, SELECTIVE, DISABLED, GLOBAL
+from gargoyle.tests.models import InterestingInfo
+from gargoyle.tests import models
+from gargoyle.conditions import ModelConditionSet, Boolean, String
 
 class GargoyleTest(TestCase):
     urls = 'gargoyle.tests.urls'
-    
+
     def setUp(self):
         self.user = User.objects.create(username='foo', email='foo@example.com')
         self.gargoyle = SwitchManager(Switch, key='key', value='value', instances=True, auto_create=True)
@@ -30,17 +33,17 @@ class GargoyleTest(TestCase):
         self.assertTrue('gargoyle.builtins.UserConditionSet(auth.user)' in self.gargoyle._registry)
         self.assertTrue('gargoyle.builtins.IPAddressConditionSet' in self.gargoyle._registry)
         self.assertEquals(len(list(self.gargoyle.get_condition_sets())), 2, self.gargoyle)
-        
+
     def test_user(self):
         condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
-        
+
         # we need a better API for this (model dict isnt cutting it)
         switch = Switch.objects.create(
             key='test',
             status=SELECTIVE,
         )
         switch = self.gargoyle['test']
-        
+
         switch.add_condition(
             condition_set=condition_set,
             field_name='percent',
@@ -52,7 +55,7 @@ class GargoyleTest(TestCase):
 
         user = User(pk=8771)
         self.assertFalse(self.gargoyle.is_active('test', user))
-        
+
         switch.add_condition(
             condition_set=condition_set,
             field_name='is_staff',
@@ -70,7 +73,7 @@ class GargoyleTest(TestCase):
             field_name='is_superuser',
             condition='1',
         )
-        
+
         user = User(pk=8771, is_superuser=True)
         self.assertTrue(self.gargoyle.is_active('test', user))
 
@@ -79,13 +82,13 @@ class GargoyleTest(TestCase):
 
     def test_exclusions(self):
         condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
-        
+
         switch = Switch.objects.create(
             key='test',
             status=SELECTIVE,
         )
         switch = self.gargoyle['test']
-        
+
         switch.add_condition(
             condition_set=condition_set,
             field_name='percent',
@@ -97,7 +100,7 @@ class GargoyleTest(TestCase):
             field_name='username',
             condition='foo',
         )
-        
+
         user = User(pk=5, username='foo')
         self.assertFalse(self.gargoyle.is_active('test', user))
 
@@ -106,13 +109,13 @@ class GargoyleTest(TestCase):
 
     def test_decorator_for_user(self):
         condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
-        
+
         switch = Switch.objects.create(
             key='test',
             status=DISABLED,
         )
         switch = self.gargoyle['test']
-        
+
         @switch_is_active('test')
         def test(request):
             return True
@@ -132,18 +135,18 @@ class GargoyleTest(TestCase):
             field_name='username',
             condition='foo',
         )
-        
+
         self.assertTrue(test(request))
 
     def test_decorator_for_ip_address(self):
         condition_set = 'gargoyle.builtins.IPAddressConditionSet'
-        
+
         switch = Switch.objects.create(
             key='test',
             status=DISABLED,
         )
         switch = self.gargoyle['test']
-        
+
         @switch_is_active('test')
         def test(request):
             return True
@@ -161,7 +164,7 @@ class GargoyleTest(TestCase):
             field_name='ip_address',
             condition='192.168.1.1',
         )
-        
+
         self.assertTrue(test(request))
 
         # add in a second condition, so that removing the first one won't kick
@@ -218,10 +221,10 @@ class GargoyleTest(TestCase):
             key='test',
             status=DISABLED,
         )
-        
+
         request = HttpRequest()
         request.user = self.user
-        
+
         @switch_is_active('test', redirect_to='/foo')
         def test(request):
             return HttpResponse()
@@ -249,7 +252,7 @@ class GargoyleTest(TestCase):
 
         self.assertTrue(self.gargoyle.is_active('test'))
         self.assertTrue(self.gargoyle.is_active('test', self.user))
-        
+
         switch.status = GLOBAL
         switch.save()
 
@@ -258,9 +261,9 @@ class GargoyleTest(TestCase):
 
     def test_disable(self):
         switch = Switch.objects.create(key='test')
-        
+
         switch = self.gargoyle['test']
-        
+
         switch.status = DISABLED
         switch.save()
 
@@ -270,20 +273,20 @@ class GargoyleTest(TestCase):
 
     def test_deletion(self):
         switch = Switch.objects.create(key='test')
-        
+
         switch = self.gargoyle['test']
 
         self.assertTrue('test' in self.gargoyle)
-        
+
         switch.delete()
-        
+
         self.assertFalse('test' in self.gargoyle)
 
     def test_expiration(self):
         switch = Switch.objects.create(key='test')
-        
+
         switch = self.gargoyle['test']
-        
+
         switch.status = DISABLED
         switch.save()
 
@@ -303,19 +306,19 @@ class GargoyleTest(TestCase):
 
         # any request should expire the in memory cache
         self.client.get('/')
-        
+
         self.assertTrue(self.gargoyle.is_active('test'))
 
     def test_anonymous_user(self):
         condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
 
         switch = Switch.objects.create(key='test')
-        
+
         switch = self.gargoyle['test']
-        
+
         switch.status = SELECTIVE
         switch.save()
-        
+
         user = AnonymousUser()
 
         self.assertTrue(self.gargoyle.is_active('test', user))
@@ -352,7 +355,7 @@ class GargoyleTest(TestCase):
 
     def test_ip_address(self):
         condition_set = 'gargoyle.builtins.IPAddressConditionSet'
-        
+
         switch = Switch.objects.create(
             key='test',
             status=SELECTIVE,
@@ -400,7 +403,7 @@ class GargoyleTest(TestCase):
 
         # test with mock request
         self.assertTrue(self.gargoyle.is_active('test', self.gargoyle.as_request(ip_address='192.168.1.1')))
-        
+
         switch.clear_conditions(
             condition_set=condition_set,
         )
@@ -408,28 +411,28 @@ class GargoyleTest(TestCase):
             condition_set=condition_set,
             field_name='percent',
             condition='0-50',
-        )        
+        )
         self.assertFalse(self.gargoyle.is_active('test', request))
 
     def test_to_dict(self):
         condition_set = 'gargoyle.builtins.IPAddressConditionSet'
-        
+
         switch = Switch.objects.create(
             label='my switch',
             description='foo bar baz',
             key='test',
             status=SELECTIVE,
         )
-        
+
         switch.add_condition(
             manager=self.gargoyle,
             condition_set=condition_set,
             field_name='ip_address',
             condition='192.168.1.1',
         )
-        
+
         result = switch.to_dict(self.gargoyle)
-        
+
         self.assertTrue('label' in result)
         self.assertEquals(result['label'], 'my switch')
 
@@ -438,7 +441,7 @@ class GargoyleTest(TestCase):
 
         self.assertTrue('description' in result)
         self.assertEquals(result['description'], 'foo bar baz')
-        
+
         self.assertTrue('key' in result)
         self.assertEquals(result['key'], 'test')
 
@@ -452,7 +455,7 @@ class GargoyleTest(TestCase):
         self.assertEquals(condition['label'], 'IP Address')
         self.assertTrue('conditions' in condition)
         self.assertEquals(len(condition['conditions']), 1)
-        
+
         inner_condition = condition['conditions'][0]
         self.assertEquals(len(inner_condition), 4)
         self.assertTrue(inner_condition[0], 'ip_address')
@@ -545,7 +548,7 @@ class GargoyleConstantTest(TestCase):
 class GargoyleMockRequestTest(TestCase):
     def setUp(self):
         self.gargoyle = SwitchManager(Switch, key='key', value='value', instances=True)
-    
+
     def test_empty_attrs(self):
         req = MockRequest()
         self.assertEquals(req.META['REMOTE_ADDR'], None)
@@ -561,23 +564,29 @@ class GargoyleMockRequestTest(TestCase):
         req = MockRequest(user=user)
         self.assertEquals(req.META['REMOTE_ADDR'], None)
         self.assertEquals(req.user, user)
-    
+
     def test_as_request(self):
         user = User.objects.create(username='foo', email='foo@example.com')
-        
+
         req = self.gargoyle.as_request(user=user, ip_address='127.0.0.1')
 
         self.assertEquals(req.META['REMOTE_ADDR'], '127.0.0.1')
         self.assertEquals(req.user, user)
-        
+
+
+class InterestingInfoConditionSet(ModelConditionSet):
+    username = String()
+
+
+
 class GargoyleTemplateTagTest(TestCase):
     urls = 'gargoyle.tests.urls'
-    
+
     def setUp(self):
         self.user = User.objects.create(username='foo', email='foo@example.com')
         self.gargoyle = SwitchManager(Switch, key='key', value='value', instances=True)
         self.gargoyle.register(UserConditionSet(User))
-        
+
     def test_simple(self):
         Switch.objects.create(
             key='test',
@@ -591,9 +600,9 @@ class GargoyleTemplateTagTest(TestCase):
             {% endifswitch %}
         """)
         rendered = template.render(Context())
-        
+
         self.assertTrue('hello world!' in rendered)
-    
+
     def test_else(self):
         template = Template("""
             {% load gargoyle_tags %}
@@ -604,13 +613,13 @@ class GargoyleTemplateTagTest(TestCase):
             {% endifswitch %}
         """)
         rendered = template.render(Context())
-        
+
         self.assertTrue('foo bar baz' in rendered)
         self.assertFalse('hello world!' in rendered)
 
     def test_with_request(self):
         condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
-        
+
         switch = Switch.objects.create(
             key='test',
             status=SELECTIVE,
@@ -622,10 +631,10 @@ class GargoyleTemplateTagTest(TestCase):
             field_name='percent',
             condition='0-50',
         )
-        
+
         request = HttpRequest()
         request.user = self.user
-        
+
         template = Template("""
             {% load gargoyle_tags %}
             {% ifswitch test %}
@@ -635,7 +644,7 @@ class GargoyleTemplateTagTest(TestCase):
             {% endifswitch %}
         """)
         rendered = template.render(Context({'request': request}))
-        
+
         self.assertFalse('foo bar baz' in rendered)
         self.assertTrue('hello world!' in rendered)
 
@@ -646,3 +655,43 @@ class GargoyleTemplateTagTest(TestCase):
             hello world!
             {% endifswitch %}
         """)
+
+
+    def test_extra_context(self):
+        # Must register condition set with global SwitchManager so that it can
+        # be picked up in the template tag
+        from gargoyle import gargoyle
+        gargoyle.register(InterestingInfoConditionSet(models.InterestingInfo))
+        info = models.InterestingInfo.objects.create(username="john")
+
+        condition_set = 'gargoyle.tests.tests.InterestingInfoConditionSet(tests.interestinginfo)'
+
+        switch = Switch.objects.create(
+            key='test',
+            status=SELECTIVE,
+        )
+
+        switch = gargoyle['test']
+
+        switch.add_condition(
+            condition_set=condition_set,
+            field_name='username',
+            condition='john',
+        )
+
+        template = Template("""
+            {% load gargoyle_tags %}
+            {% ifswitch test %}
+            hello world!
+            {% endifswitch %}
+        """)
+
+        # Shouldn't render if object not passed in context
+        rendered = template.render(Context())
+        self.assertFalse('hello world!' in rendered)
+
+        # Should render if object not passed in context
+        rendered = template.render(Context({'gargoyle':[info]}))
+        self.assertTrue('hello world!' in rendered)
+
+

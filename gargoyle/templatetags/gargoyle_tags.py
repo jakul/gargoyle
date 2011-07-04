@@ -27,7 +27,7 @@ def ifswitch(parser, token):
         parser.delete_first_token()
     else:
         nodelist_false = template.NodeList()
-    
+
     return SwitchNode(nodelist_true, nodelist_false, name)
 
 class SwitchNode(template.Node):
@@ -41,6 +41,9 @@ class SwitchNode(template.Node):
             conditions = [context['request']]
         else:
             conditions = []
+
+        if 'gargoyle' in context:
+            conditions.extend(context['gargoyle'])
 
         if not gargoyle.is_active(self.name, *conditions):
             return self.nodelist_false.render(context)
