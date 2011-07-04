@@ -66,11 +66,11 @@ def autodiscover():
         # be found # but doesn't actually try to import the module. So skip this
         # app if its gargoyle_conditions.py doesn't exist
         try:
-            imp.find_module('gargoyle_conditions', app_path)
+            imp.find_module('gargoyle', app_path)
         except ImportError:
             continue
-        
-        import_module("%s.gargoyle_conditions" % app)
+
+        import_module("%s.gargoyle" % app)
 
     # load builtins
     import gargoyle.builtins
