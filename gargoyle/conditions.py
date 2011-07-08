@@ -75,6 +75,14 @@ class Choice(Field):
             raise ValidationError
         return value
 
+    def render(self, value):
+        output = ["<select name='%s'>" % escape(self.name)]
+        for choice in self.choices:
+            output.append('<option %s value="%s">%s</option>' % (
+                value and "selected" or '', escape(choice), escape(choice)))
+        output.append("</select>")
+        return mark_safe("".join(output))
+
 class Range(Field):
     def is_active(self, condition, value):
         return value >= condition[0] and value <= condition[1]

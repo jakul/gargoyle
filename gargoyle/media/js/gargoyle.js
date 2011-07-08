@@ -120,7 +120,7 @@ $(document).ready(function () {
         }
     });
     
-    $("div.conditionsForm select").live("change", function () {
+    $("div.conditionsForm select[name='condition']").live("change", function () {
         var field = $(this).val().split(",");
         $(this).
             parents("tr:first").
@@ -140,7 +140,7 @@ $(document).ready(function () {
             field: $(this).attr("data-field")
         };
         
-        $.each($(this).find("input"), function () {
+        $.each($(this).find("input,select"), function () {
             var val;
 
             if ($(this).attr('type') == 'checkbox') {
