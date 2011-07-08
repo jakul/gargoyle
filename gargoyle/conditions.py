@@ -68,7 +68,7 @@ class Choice(Field):
         super(Choice, self).__init__(**kwargs)
 
     def is_active(self, condition, value):
-        return value in self.choices
+        return condition == value
     
     def clean(self, value):
         if value not in self.choices:
