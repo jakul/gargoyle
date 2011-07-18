@@ -16,6 +16,8 @@ from django.core.validators import ValidationError
 
 from gargoyle.models import EXCLUDE
 
+import itertools
+
 def titlize(s):
     return s.title().replace('_', ' ')
 
@@ -94,7 +96,7 @@ class Range(Field):
     def clean(self, value):
         if value:
             try:
-                numeric = map(int, value)
+                map(int, value)
             except (TypeError, ValueError):
                 raise ValidationError('You must enter valid integer values.')
         return '-'.join(value)
@@ -200,6 +202,19 @@ class ConditionSet(object):
         if callable(value):
             value = value()
         return value
+
+    def has_active_condition(self, conditions, instances):
+        """
+        Given a list of instances, and the conditions active for
+        this switch, returns a boolean reprsenting if any
+        conditional is met, including a non-instance default.
+        """
+        for instance in itertools.chain(instances, [None]):
+            if not self.can_execute(instance):
+                continue
+            if self.is_active(instance, conditions):
+                return True
+        return False
 
     def is_active(self, instance, conditions):
         """
