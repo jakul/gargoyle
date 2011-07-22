@@ -66,6 +66,13 @@ class Boolean(Field):
 
 class Choice(Field):
     def __init__(self, choices, **kwargs):
+            
+        # Convert a single-tuple into a two-tuple
+        try:
+            if len(choices[0]) == 1:
+                choices = zip(choices, map(titlize, choices))
+        except KeyError:
+            pass
         self.choices = choices
         super(Choice, self).__init__(**kwargs)
 
@@ -73,17 +80,20 @@ class Choice(Field):
         return condition == value
     
     def clean(self, value):
-        if value not in self.choices:
-            raise ValidationError
+        if value not in [x[0] for x in self.choices]:
+            raise ValidationError("%r is not a valid choice" % value)
         return value
 
     def render(self, value):
         output = ["<select name='%s'>" % escape(self.name)]
-        for choice in self.choices:
+        for choice,label in self.choices:
             output.append('<option %s value="%s">%s</option>' % (
-                value and "selected" or '', escape(choice), escape(choice)))
+                value and "selected" or '', escape(choice), escape(label)))
         output.append("</select>")
         return mark_safe("".join(output))
+
+    def display(self, value):
+        return dict(self.choices).get(value,"Unknown Value")
 
 class Range(Field):
     def is_active(self, condition, value):
