@@ -64,7 +64,7 @@ def autodiscover():
         # Step 2: use imp.find_module to find the app's gargoyle_conditions.py.
         # For some # reason imp.find_module raises ImportError if the app can't
         # be found # but doesn't actually try to import the module. So skip this
-        # app if its gargoyle_conditions.py doesn't exist
+        # app if its gargoyle.py doesn't exist
         try:
             imp.find_module('gargoyle', app_path)
         except ImportError:
