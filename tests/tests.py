@@ -6,6 +6,8 @@ gargoyle.tests.tests
 :license: Apache License 2.0, see LICENSE for more details.
 """
 
+import datetime
+
 from django.contrib.auth.models import User, AnonymousUser
 from django.core.cache import cache
 from django.http import HttpRequest, Http404, HttpResponse
@@ -16,6 +18,7 @@ from gargoyle.builtins import IPAddressConditionSet, UserConditionSet, HostCondi
 from gargoyle.decorators import switch_is_active
 from gargoyle.helpers import MockRequest
 from gargoyle.models import Switch, SwitchManager, SELECTIVE, DISABLED, GLOBAL
+from gargoyle.testutils import switches
 
 import socket
 from gargoyle.conditions import ModelConditionSet, String
@@ -80,6 +83,28 @@ class APITest(TestCase):
 
         # test with mock request
         self.assertTrue(self.gargoyle.is_active('test', self.gargoyle.as_request(user=user)))
+
+        # test date joined condition
+        user = User(pk=8771)
+        self.assertFalse(self.gargoyle.is_active('test', user))
+
+        switch.add_condition(
+            condition_set=condition_set,
+            field_name='date_joined',
+            condition='2011-07-01',
+        )
+
+        user = User(pk=8771, date_joined=datetime.datetime(2011, 07, 02))
+        self.assertTrue(self.gargoyle.is_active('test', user))
+
+        user = User(pk=8771, date_joined=datetime.datetime(2012, 07, 02))
+        self.assertTrue(self.gargoyle.is_active('test', user))
+
+        user = User(pk=8771, date_joined=datetime.datetime(2011, 06, 02))
+        self.assertFalse(self.gargoyle.is_active('test', user))
+
+        user = User(pk=8771, date_joined=datetime.datetime(2011, 07, 01))
+        self.assertTrue(self.gargoyle.is_active('test', user))
 
     def test_exclusions(self):
         condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
@@ -464,7 +489,6 @@ class APITest(TestCase):
         self.assertTrue(inner_condition[2], '192.168.1.1')
         self.assertFalse(inner_condition[3])
 
-
     def test_remove_condition(self):
         condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
 
@@ -698,6 +722,39 @@ class TemplateTagTest(TestCase):
         rendered = template.render(Context({'gargoyle':[info]}))
         self.assertTrue('hello world!' in rendered)        
 
+    def test_with_custom_objects(self):
+        condition_set = 'gargoyle.builtins.UserConditionSet(auth.user)'
+
+        switch = Switch.objects.create(
+            key='test',
+            status=SELECTIVE,
+        )
+        switch = self.gargoyle['test']
+
+        switch.add_condition(
+            condition_set=condition_set,
+            field_name='percent',
+            condition='0-50',
+        )
+
+        request = HttpRequest()
+        request.user = self.user
+
+        # Pass in request.user explicitly.
+        template = Template("""
+            {% load gargoyle_tags %}
+            {% ifswitch test request.user %}
+            hello world!
+            {% else %}
+            foo bar baz
+            {% endifswitch %}
+        """)
+        rendered = template.render(Context({'request': request}))
+
+        self.assertFalse('foo bar baz' in rendered)
+        self.assertTrue('hello world!' in rendered)
+
+
 class HostConditionSetTest(TestCase):
     def setUp(self):
         self.gargoyle = SwitchManager(Switch, key='key', value='value', instances=True, auto_create=True)
@@ -722,4 +779,44 @@ class HostConditionSetTest(TestCase):
         )
 
         self.assertTrue(self.gargoyle.is_active('test'))
+
+class SwitchContextManagerTest(TestCase):
+    def setUp(self):
+        self.gargoyle = SwitchManager(Switch, key='key', value='value', instances=True, auto_create=True)
+
+    def test_as_decorator(self):
+        switch = self.gargoyle['test']
+        switch.status = DISABLED
+        
+        @switches(self.gargoyle, test=True)
+        def test():
+            return self.gargoyle.is_active('test')
+        
+        self.assertTrue(test())
+        self.assertEquals(self.gargoyle['test'].status, DISABLED)
+
+        switch.status = GLOBAL
+        
+        @switches(self.gargoyle, test=False)
+        def test():
+            return self.gargoyle.is_active('test')
+
+        self.assertFalse(test())
+        self.assertEquals(self.gargoyle['test'].status, GLOBAL)
+
+    def test_context_manager(self):
+        switch = self.gargoyle['test']
+        switch.status = DISABLED
+        
+        with switches(self.gargoyle, test=True):
+            self.assertTrue(self.gargoyle.is_active('test'))
+        
+        self.assertEquals(self.gargoyle['test'].status, DISABLED)
+
+        switch.status = GLOBAL
+        
+        with switches(self.gargoyle, test=False):
+            self.assertFalse(self.gargoyle.is_active('test'))
+        
+        self.assertEquals(self.gargoyle['test'].status, GLOBAL)
 
