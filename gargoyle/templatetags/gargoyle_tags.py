@@ -47,6 +47,16 @@ class SwitchNode(template.Node):
 
         if 'gargoyle' in context:
             instances.extend(context['gargoyle'])
+        
+        # Loop though the context dicts and search for any
+        # keys starting with gargoyle_. Append these to the
+        # list of conditions.
+        # We loop backwards so that items higher up on the
+        # stack overwrite items lower on the stack.
+        for context_dict in context.dicts[::-1]:
+            for key,value in context_dict.iteritems():
+                if key.startswith('gargoyle_'):
+                    instances.extend(value)
 
         if not gargoyle.is_active(self.name, *instances):
             return self.nodelist_false.render(context)
