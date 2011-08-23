@@ -71,7 +71,7 @@ class Choice(Field):
             
         # Convert a single-tuple into a two-tuple
         try:
-            if len(choices) >= 1 && len(choices[0]) == 1:
+            if len(choices) >= 1 and len(choices[0]) == 1:
                 choices = zip(choices, map(titlize, choices))
         except KeyError:
             pass
