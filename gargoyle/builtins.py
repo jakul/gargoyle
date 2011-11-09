@@ -16,8 +16,8 @@ from django.core.validators import validate_ipv4_address
 import socket
 
 class UserConditionSet(ModelConditionSet):
-    percent = Percent()
     username = String()
+    email = String()
     is_anonymous = Boolean(label='Anonymous')
     is_staff = Boolean(label='Staff')
     is_superuser = Boolean(label='Superuser')
